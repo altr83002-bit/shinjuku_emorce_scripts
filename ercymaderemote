@@ -195,8 +195,8 @@ local function getClosestPlayer()
 end
 
 local function tryReload(tool)
-	-- Only reload on Nambu
-	if tool.Name ~= "Nambu" then return end
+	-- Same reload settings for both Nambu and Mossberg
+	if tool.Name ~= "Nambu" and tool.Name ~= "Mossberg" then return end
 
 	local reloadEvent = tool:FindFirstChild("ReloadEvent")
 		or tool:FindFirstChild("Reload")
