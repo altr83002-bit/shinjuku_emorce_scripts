@@ -1,0 +1,273 @@
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local currentTarget = nil
+local MAX_RANGE = 3000
+local whitelist = {} -- [player] = true
+local lastLowHPFire = 0
+local LOW_HP_DELAY = 1.0 -- wait 1 second when target is at 1 HP
+
+-- ==================== TARGET GUI ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TargetGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 40)
+frame.Position = UDim2.new(1, -240, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BackgroundTransparency = 0.25
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Target: None"
+title.TextColor3 = Color3.fromRGB(255, 80, 80)
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+local function updateGUI()
+	if currentTarget and currentTarget.Parent then
+		title.Text = "Target: " .. currentTarget.Name
+		title.TextColor3 = Color3.fromRGB(0, 255, 120)
+	else
+		title.Text = "Target: None"
+		title.TextColor3 = Color3.fromRGB(255, 80, 80)
+	end
+end
+
+-- ==================== WHITELIST GUI ====================
+local wlGui = Instance.new("ScreenGui")
+wlGui.Name = "WhitelistGUI"
+wlGui.ResetOnSpawn = false
+wlGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local wlFrame = Instance.new("Frame")
+wlFrame.Size = UDim2.new(0, 180, 0, 250)
+wlFrame.Position = UDim2.new(0, 20, 0.5, -125)
+wlFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+wlFrame.BackgroundTransparency = 0.35
+wlFrame.BorderSizePixel = 0
+wlFrame.Parent = wlGui
+
+local wlCorner = Instance.new("UICorner")
+wlCorner.CornerRadius = UDim.new(0, 8)
+wlCorner.Parent = wlFrame
+
+local wlTitle = Instance.new("TextLabel")
+wlTitle.Size = UDim2.new(1, 0, 0, 28)
+wlTitle.BackgroundTransparency = 1
+wlTitle.Text = "ercytool"
+wlTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+wlTitle.TextSize = 14
+wlTitle.Font = Enum.Font.GothamBold
+wlTitle.Parent = wlFrame
+
+local scrolling = Instance.new("ScrollingFrame")
+scrolling.Size = UDim2.new(1, -10, 1, -35)
+scrolling.Position = UDim2.new(0, 5, 0, 30)
+scrolling.BackgroundTransparency = 1
+scrolling.BorderSizePixel = 0
+scrolling.ScrollBarThickness = 4
+scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrolling.Parent = wlFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 4)
+listLayout.Parent = scrolling
+
+local function refreshWhitelistGUI()
+	for _, child in ipairs(scrolling:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+
+	local y = 0
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, -6, 0, 26)
+			btn.BackgroundColor3 = whitelist[player] and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40, 40, 40)
+			btn.BackgroundTransparency = 0.2
+			btn.BorderSizePixel = 0
+			btn.Text = player.Name
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextSize = 13
+			btn.Font = Enum.Font.Gotham
+			btn.Parent = scrolling
+
+			local btnCorner = Instance.new("UICorner")
+			btnCorner.CornerRadius = UDim.new(0, 6)
+			btnCorner.Parent = btn
+
+			btn.MouseButton1Click:Connect(function()
+				if whitelist[player] then
+					whitelist[player] = nil
+					btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+				else
+					whitelist[player] = true
+					btn.BackgroundColor3 = Color3.fromRGB(0, 120, 60)
+				end
+			end)
+
+			y = y + 30
+		end
+	end
+	scrolling.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+Players.PlayerAdded:Connect(function()
+	task.wait(0.5)
+	refreshWhitelistGUI()
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	whitelist[player] = nil
+	refreshWhitelistGUI()
+end)
+
+refreshWhitelistGUI()
+
+-- =============================================
+local function hasWallBetween(fromPos, toPos)
+	local direction = toPos - fromPos
+	local distance = direction.Magnitude
+	if distance < 1 then return false end
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {LocalPlayer.Character}
+
+	local result = workspace:Raycast(fromPos, direction.Unit * distance, params)
+	if result then
+		local hitChar = result.Instance:FindFirstAncestorOfClass("Model")
+		if hitChar and Players:GetPlayerFromCharacter(hitChar) then
+			return false
+		end
+		return true
+	end
+	return false
+end
+
+local function getClosestPlayer()
+	local character = LocalPlayer.Character
+	if not character then return nil end
+
+	local myHRP = character:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return nil end
+
+	local closestPlayer = nil
+	local shortestDistance = math.huge
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and not whitelist[player] then
+			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+			local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+
+			if hrp and humanoid and humanoid.Health > 0 then
+				local distance = (myHRP.Position - hrp.Position).Magnitude
+				if distance <= MAX_RANGE and distance < shortestDistance then
+					if not hasWallBetween(myHRP.Position, hrp.Position) then
+						shortestDistance = distance
+						closestPlayer = player
+					end
+				end
+			end
+		end
+	end
+
+	return closestPlayer
+end
+
+local function tryReload(tool)
+	-- Only reload on Nambu
+	if tool.Name ~= "Nambu" then return end
+
+	local reloadEvent = tool:FindFirstChild("ReloadEvent")
+		or tool:FindFirstChild("Reload")
+		or tool:FindFirstChild("RemoteReload")
+		or tool:FindFirstChild("ReloadRemote")
+
+	if reloadEvent and reloadEvent:IsA("RemoteEvent") then
+		reloadEvent:FireServer()
+	end
+end
+
+-- Main loop (lowest possible delay)
+while true do
+	task.wait()
+
+	local character = LocalPlayer.Character
+	if not character then continue end
+
+	local tool = character:FindFirstChild("Howa")
+		or character:FindFirstChild("Nambu")
+		or character:FindFirstChild("P9")
+		or character:FindFirstChild("MP5")
+		or character:FindFirstChild("Mossberg")
+
+	if not tool then continue end
+
+	local fireEvent = tool:FindFirstChild("FireEvent")
+	if not fireEvent then continue end
+
+	local myHRP = character:FindFirstChild("HumanoidRootPart")
+	if not myHRP then continue end
+
+	local originPart = tool:FindFirstChild("Handle") or myHRP
+	local base = originPart.Position
+
+	currentTarget = getClosestPlayer()
+	updateGUI()
+
+	if not currentTarget or not currentTarget.Character then continue end
+
+	local humanoid = currentTarget.Character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		currentTarget = nil
+		updateGUI()
+		continue
+	end
+
+	-- When target is at 1 HP (knocked), wait 1 second before firing again
+	if humanoid.Health <= 1 then
+		if tick() - lastLowHPFire < LOW_HP_DELAY then
+			continue
+		end
+		lastLowHPFire = tick()
+	end
+
+	local targetPart
+	if humanoid.Health <= 15 then
+		targetPart = currentTarget.Character:FindFirstChild("UpperTorso")
+			or currentTarget.Character:FindFirstChild("Torso")
+	else
+		targetPart = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+	end
+
+	if not targetPart then continue end
+
+	local args = {
+		vector.create(base.X, base.Y, base.Z),
+		targetPart,
+		vector.create(base.X + 0.42, base.Y - 1, base.Z + 0.52)
+	}
+
+	fireEvent:FireServer(unpack(args))
+	tryReload(tool)
+end
