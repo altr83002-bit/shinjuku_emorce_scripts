@@ -1,0 +1,877 @@
+-- ██▒   █▓ ▄▄▄       ███▄ ▄███▓ ██▓███  ▓█████   ██████  ██▓███  
+--▓██░   █▒▒████▄    ▓██▒▀█▀ ██▒▓██░  ██▒▓█   ▀ ▒██    ▒ ▓██░  ██▒
+-- ▓██  █▒░▒██  ▀█▄  ▓██    ▓██░▓██░ ██▓▒▒███   ░ ▓██▄   ▓██░ ██▓▒
+ -- ▒██ █░░░██▄▄▄▄██ ▒██    ▒██ ▒██▄█▓▒ ▒▒▓█  ▄   ▒   ██▒▒██▄█▓▒ ▒
+  -- ▒▀█░   ▓█   ▓██▒▒██▒   ░██▒▒██▒ ░  ░░▒████▒▒██████▒▒▒██▒ ░  ░
+  -- ░ ▐░   ▒▒   ▓▒█░░ ▒░   ░  ░▒▓▒░ ░  ░░░ ▒░ ░▒ ▒▓▒ ▒ ░▒▓▒░ ░  ░
+ --  ░ ░░    ▒   ▒▒ ░░  ░      ░░▒ ░      ░ ░  ░░ ░▒  ░ ░░▒ ░     
+ --    ░░    ░   ▒   ░      ░   ░░          ░   ░  ░  ░  ░░       
+ --     ░        ░  ░       ░               ░  ░      ░           
+ --    ░                                                          
+	 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+local ESP_ENABLED   = true
+local CHAMS_ENABLED = true
+local INFO_ENABLED  = true
+local AURA_ENABLED  = false
+
+local BEHIND_INDICATOR = false
+
+local AURA_MODE = "Default"
+
+-------------------------------------------------------
+-- GUI
+-------------------------------------------------------
+
+local SPIDER_WEB_IMAGE = "rbxassetid://PUT_YOUR_IMAGE_ID_HERE"
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.fromOffset(280,480)
+mainFrame.Position = UDim2.fromScale(0.02,0.6)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local sharp = Instance.new("UICorner")
+sharp.CornerRadius = UDim.new(0,0)
+sharp.Parent = mainFrame
+
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(30,30,30)
+frameStroke.Thickness = 2
+frameStroke.Parent = mainFrame
+
+-------------------------------------------------------
+-- DRAG
+-------------------------------------------------------
+
+local dragging, dragStart, startPos
+
+local function updateDrag(input)
+	local delta = input.Position - dragStart
+	mainFrame.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end
+
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		updateDrag(input)
+	end
+end)
+
+-------------------------------------------------------
+-- BACKGROUND
+-------------------------------------------------------
+
+local web = Instance.new("ImageLabel")
+web.BackgroundTransparency = 1
+web.Size = UDim2.fromScale(1,1)
+web.Image = SPIDER_WEB_IMAGE
+web.ScaleType = Enum.ScaleType.Tile
+web.TileSize = UDim2.fromOffset(96,96)
+web.ImageTransparency = 0.25
+web.ZIndex = 2
+web.Parent = mainFrame
+
+-------------------------------------------------------
+-- TITLE
+-------------------------------------------------------
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1,-12,0,28)
+title.Position = UDim2.fromOffset(6,4)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.new(1,1,1)
+title.TextStrokeTransparency = 0.2
+title.ZIndex = 3
+title.Text = "Welcome, "..LocalPlayer.DisplayName
+title.Parent = mainFrame
+
+task.delay(2.5,function()
+	if title.Parent then
+		title.Text = "v4mpE$P v1"
+	end
+end)
+
+local sub = Instance.new("TextLabel")
+sub.BackgroundTransparency = 1
+sub.Size = UDim2.new(1,-12,0,18)
+sub.Position = UDim2.fromOffset(6,32)
+sub.Text = "@vampirewalk on dc"
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 12
+sub.TextColor3 = Color3.fromRGB(200,200,200)
+sub.ZIndex = 3
+sub.Parent = mainFrame
+
+-------------------------------------------------------
+-- MINIMIZE BUTTON
+-------------------------------------------------------
+
+local expandedSize = mainFrame.Size
+local collapsed = false
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.fromOffset(24,20)
+minimizeBtn.Position = UDim2.new(1,-30,0,6)
+minimizeBtn.Text = ""
+minimizeBtn.AutoButtonColor = false
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+minimizeBtn.ZIndex = 6
+minimizeBtn.Parent = mainFrame
+
+local miniCorner = Instance.new("UICorner")
+miniCorner.CornerRadius = UDim.new(0,6)
+miniCorner.Parent = minimizeBtn
+
+local miniStroke = Instance.new("UIStroke")
+miniStroke.Thickness = 1.5
+miniStroke.Parent = minimizeBtn
+
+local function makeLine(y)
+	local l = Instance.new("Frame")
+	l.Size = UDim2.new(1,-6,0,2)
+	l.Position = UDim2.fromOffset(3,y)
+	l.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	l.BorderSizePixel = 0
+	l.Parent = minimizeBtn
+end
+
+makeLine(4)
+makeLine(9)
+makeLine(14)
+
+do
+	local purple = Color3.fromRGB(160,80,255)
+	local black = Color3.fromRGB(0,0,0)
+
+	task.spawn(function()
+		local t,dir=0,1
+		while minimizeBtn.Parent do
+			local dt=RunService.Heartbeat:Wait()
+			t+=dir*dt*1.2
+			if t>=1 then t=1 dir=-1 end
+			if t<=0 then t=0 dir=1 end
+			miniStroke.Color = purple:Lerp(black,t)
+		end
+	end)
+end
+
+-------------------------------------------------------
+-- PAGES
+-------------------------------------------------------
+
+local mainPage = Instance.new("Frame")
+mainPage.BackgroundTransparency = 1
+mainPage.Position = UDim2.fromOffset(38,54)
+mainPage.Size = UDim2.new(1,-38,1,-54)
+mainPage.Parent = mainFrame
+
+local miscPage = Instance.new("Frame")
+miscPage.BackgroundTransparency = 1
+miscPage.Position = mainPage.Position
+miscPage.Size = mainPage.Size
+miscPage.Visible = false
+miscPage.Parent = mainFrame
+
+-------------------------------------------------------
+-- SIDE TABS
+-------------------------------------------------------
+
+local function createTab(text,posY)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.fromOffset(34,80)
+	b.Position = UDim2.fromOffset(2,posY)
+	b.Text = text
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.BackgroundColor3 = Color3.fromRGB(20,20,20)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Parent = mainFrame
+	return b
+end
+
+local mainTab = createTab("M\nA\nI\nN",60)
+local miscTab = createTab("M\nI\nS\nC",145)
+
+local mainTabStroke = Instance.new("UIStroke")
+mainTabStroke.Thickness = 1.5
+mainTabStroke.Enabled = true
+mainTabStroke.Parent = mainTab
+
+local miscTabStroke = Instance.new("UIStroke")
+miscTabStroke.Thickness = 1.5
+miscTabStroke.Enabled = false
+miscTabStroke.Parent = miscTab
+
+local function startTabPulse(strokeObj)
+	local purple = Color3.fromRGB(160,80,255)
+	local black  = Color3.fromRGB(0,0,0)
+
+	task.spawn(function()
+		local t,dir=0,1
+		while strokeObj.Parent do
+			if strokeObj.Enabled then
+				local dt=RunService.Heartbeat:Wait()
+				t+=dir*dt*1.2
+				if t>=1 then t=1 dir=-1 end
+				if t<=0 then t=0 dir=1 end
+				strokeObj.Color = purple:Lerp(black,t)
+			else
+				RunService.Heartbeat:Wait()
+			end
+		end
+	end)
+end
+
+startTabPulse(mainTabStroke)
+startTabPulse(miscTabStroke)
+
+mainTab.MouseButton1Click:Connect(function()
+	mainPage.Visible=true
+	miscPage.Visible=false
+	mainTabStroke.Enabled=true
+	miscTabStroke.Enabled=false
+end)
+
+miscTab.MouseButton1Click:Connect(function()
+	mainPage.Visible=false
+	miscPage.Visible=true
+	mainTabStroke.Enabled=false
+	miscTabStroke.Enabled=true
+end)
+
+-------------------------------------------------------
+-- MINIMIZE CLICK
+-------------------------------------------------------
+
+minimizeBtn.MouseButton1Click:Connect(function()
+	collapsed = not collapsed
+
+	if collapsed then
+		mainPage.Visible=false
+		miscPage.Visible=false
+		mainTab.Visible=false
+		miscTab.Visible=false
+		sub.Visible=false
+
+		TweenService:Create(mainFrame,TweenInfo.new(0.25),{
+			Size=UDim2.fromOffset(280,36)
+		}):Play()
+	else
+		mainTab.Visible=true
+		miscTab.Visible=true
+		mainPage.Visible=true
+		sub.Visible=true
+
+		TweenService:Create(mainFrame,TweenInfo.new(0.25),{
+			Size=expandedSize
+		}):Play()
+	end
+end)
+
+-------------------------------------------------------
+-- TOGGLES
+-------------------------------------------------------
+
+local function makeToggle(parent,text,y,getState,setState)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-14,0,26)
+	b.Position = UDim2.fromOffset(7,y)
+	b.BackgroundColor3 = Color3.fromRGB(20,20,20)
+	b.BorderSizePixel = 0
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Parent = parent
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 1.5
+	stroke.Enabled = false
+	stroke.Parent = b
+
+	local purple = Color3.fromRGB(160,80,255)
+	local black  = Color3.fromRGB(0,0,0)
+	local running=false
+
+	task.spawn(function()
+		local t,dir=0,1
+		while b.Parent do
+			if running then
+				local dt=RunService.Heartbeat:Wait()
+				t+=dir*dt*1.2
+				if t>=1 then t=1 dir=-1 end
+				if t<=0 then t=0 dir=1 end
+				stroke.Color = purple:Lerp(black,t)
+			else
+				RunService.Heartbeat:Wait()
+			end
+		end
+	end)
+
+	local function refresh()
+		local on=getState()
+		b.Text=text..": "..(on and "ON" or "OFF")
+		stroke.Enabled=on
+		running=on
+	end
+
+	b.MouseButton1Click:Connect(function()
+		setState(not getState())
+		refresh()
+	end)
+
+	refresh()
+end
+
+makeToggle(mainPage,"ESP",8,function()return ESP_ENABLED end,function(v)ESP_ENABLED=v end)
+makeToggle(mainPage,"Chams",38,function()return CHAMS_ENABLED end,function(v)CHAMS_ENABLED=v end)
+makeToggle(mainPage,"Info",68,function()return INFO_ENABLED end,function(v)INFO_ENABLED=v end)
+makeToggle(mainPage,"Aura",98,function()return AURA_ENABLED end,function(v)AURA_ENABLED=v end)
+
+-------------------------------------------------------
+-- AURA BUTTONS
+-------------------------------------------------------
+
+local auraButtons = {}
+
+local function getAuraOutlineColor(mode)
+	if mode=="Ice" then return Color3.fromRGB(120,180,255)
+	elseif mode=="Fire" then return Color3.fromRGB(255,90,40)
+	elseif mode=="Vamp" then return Color3.fromRGB(200,0,0)
+	elseif mode=="Purge" then return Color3.fromRGB(255,255,255)
+	elseif mode=="LockInSon" then return Color3.fromRGB(80,80,80)
+	else return Color3.fromRGB(160,80,255)
+	end
+end
+
+local function refreshAuraButtons()
+	for _,d in ipairs(auraButtons) do
+		d.stroke.Enabled = (AURA_MODE==d.mode)
+		if d.stroke.Enabled then
+			d.stroke.Color = getAuraOutlineColor(d.mode)
+		end
+	end
+end
+
+local function makeAuraButton(text,y,mode)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-14,0,24)
+	b.Position = UDim2.fromOffset(7,y)
+	b.BackgroundColor3 = Color3.fromRGB(20,20,20)
+	b.BorderSizePixel=0
+	b.Font=Enum.Font.GothamBold
+	b.TextSize=12
+	b.TextColor3=Color3.new(1,1,1)
+	b.Text=text
+	b.Parent=miscPage
+
+	local s=Instance.new("UIStroke")
+	s.Enabled=false
+	s.Thickness=1.5
+	s.Parent=b
+
+	table.insert(auraButtons,{stroke=s,mode=mode})
+
+	b.MouseButton1Click:Connect(function()
+		AURA_MODE=mode
+		refreshAuraButtons()
+	end)
+
+	refreshAuraButtons()
+end
+
+makeAuraButton("Default",8,"Default")
+makeAuraButton("Ice",36,"Ice")
+makeAuraButton("Fire",64,"Fire")
+makeAuraButton("Vamp",92,"Vamp")
+makeAuraButton("Purge",120,"Purge")
+makeAuraButton("Lock In Son",148,"LockInSon")
+
+-------------------------------------------------------
+-- MISC TOGGLE
+-------------------------------------------------------
+
+makeToggle(miscPage,"Behind Indicator",178,function()
+	return BEHIND_INDICATOR
+end,function(v)
+	BEHIND_INDICATOR = v
+end)
+
+-------------------------------------------------------
+-- HELPERS (inventory + equipped)
+-------------------------------------------------------
+
+local function getHeldTool(char)
+	for _, v in ipairs(char:GetChildren()) do
+		if v:IsA("Tool") then
+			return v.Name
+		end
+	end
+
+	local plr = Players:GetPlayerFromCharacter(char)
+	if plr and plr:FindFirstChild("Backpack") then
+		for _, v in ipairs(plr.Backpack:GetChildren()) do
+			if v:IsA("Tool") then
+				return v.Name
+			end
+		end
+	end
+
+	return "None"
+end
+
+-------------------------------------------------------
+-- ITEM NOTIFY
+-------------------------------------------------------
+
+local WATCH_ITEMS={
+	nambu=true,p9=true,howa=true,mossberg=true,mp5=true,["golden katana"]=true
+}
+
+local seenItems={}
+
+local function notifyItem(p,i)
+	pcall(function()
+		StarterGui:SetCore("SendNotification",{
+			Title="Item ESP",
+			Text=p.." has "..i,
+			Duration=4
+		})
+	end)
+end
+
+local function checkItem(player,item)
+	if not item or item=="None" then return end
+
+	local low=string.lower(item)
+
+	for k in pairs(WATCH_ITEMS) do
+		if string.find(low,k,1,true) then
+			seenItems[player]=seenItems[player] or {}
+			if not seenItems[player][k] then
+				seenItems[player][k]=true
+				notifyItem(player.Name,item)
+			end
+		end
+	end
+end
+
+-------------------------------------------------------
+-- CHAMS
+-------------------------------------------------------
+
+local function startChamsPulse(h)
+	local black=Color3.fromRGB(0,0,0)
+	local grey=Color3.fromRGB(185,185,185)
+
+	task.spawn(function()
+		local t,dir=0,1
+		while h.Parent do
+			local dt=RunService.Heartbeat:Wait()
+
+			if not ESP_ENABLED or not CHAMS_ENABLED then
+				h.Enabled=false
+				continue
+			end
+
+			h.Enabled=true
+
+			t+=dir*dt*0.6
+			if t>=1 then t=1 dir=-1 end
+			if t<=0 then t=0 dir=1 end
+
+			local c=black:Lerp(grey,t)
+			h.FillColor=c
+			h.OutlineColor=c
+		end
+	end)
+end
+
+-------------------------------------------------------
+-- AURA SYSTEM
+-------------------------------------------------------
+
+local function startAuraPulse(h)
+	local pink=Color3.fromRGB(255,105,180)
+	local black=Color3.fromRGB(0,0,0)
+
+	local iceA=Color3.fromRGB(90,170,255)
+	local iceB=Color3.fromRGB(255,255,255)
+
+	local fireA=Color3.fromRGB(255,60,60)
+	local fireB=Color3.fromRGB(255,150,0)
+	local fireC=Color3.fromRGB(255,255,255)
+
+	local vampA=Color3.fromRGB(0,0,0)
+	local vampB=Color3.fromRGB(200,0,0)
+	local vampC=Color3.fromRGB(255,255,255)
+
+	task.spawn(function()
+		local t,dir=0,1
+
+		while h.Parent do
+			local dt=RunService.Heartbeat:Wait()
+
+			if not AURA_ENABLED then
+				h.Enabled=false
+				continue
+			end
+
+			h.Enabled=true
+
+			local speed=(AURA_MODE=="LockInSon") and 0.3 or 0.6
+
+			t+=dir*dt*speed
+			if t>=1 then t=1 dir=-1 end
+			if t<=0 then t=0 dir=1 end
+
+			if AURA_MODE=="Ice" then
+				local c=iceA:Lerp(iceB,t)
+				h.FillColor=c h.OutlineColor=c
+				h.FillTransparency=0.4 h.OutlineTransparency=0.4
+
+			elseif AURA_MODE=="Fire" then
+				local c=(t<0.5) and fireA:Lerp(fireB,t*2) or fireB:Lerp(fireC,(t-0.5)*2)
+				h.FillColor=c h.OutlineColor=c
+				h.FillTransparency=0.35 h.OutlineTransparency=0.35
+
+			elseif AURA_MODE=="Vamp" then
+				local c=(t<0.5) and vampA:Lerp(vampB,t*2) or vampB:Lerp(vampC,(t-0.5)*2)
+				h.FillColor=c h.OutlineColor=c
+				h.FillTransparency=0.35 h.OutlineTransparency=0.35
+
+			elseif AURA_MODE=="Purge" then
+				local c=black:Lerp(Color3.fromRGB(255,255,255),t)
+				local s=0.25+math.abs(math.sin(t*math.pi))*0.25
+				h.FillColor=c
+				h.OutlineColor=Color3.new(1,1,1)
+				h.FillTransparency=0.55-s
+				h.OutlineTransparency=0.15
+
+			elseif AURA_MODE=="LockInSon" then
+				local base=Color3.fromRGB(60,60,60)
+				local drift=(math.sin(t*math.pi*0.5)+1)*0.5
+				local bw=black:Lerp(Color3.new(1,1,1),drift*0.4)
+				local c=base:Lerp(bw,0.35)
+				local d=math.abs(math.sin(os.clock()*6))*0.12
+
+				h.FillColor=c
+				h.OutlineColor=Color3.fromRGB(200,200,200)
+				h.FillTransparency=0.48-d
+				h.OutlineTransparency=0.12+d
+
+			else
+				local c=pink:Lerp(black,t)
+				h.FillColor=c h.OutlineColor=c
+				h.FillTransparency=0.35 h.OutlineTransparency=0.35
+			end
+		end
+	end)
+end
+
+local function setupAura(char)
+	if char:FindFirstChild("AuraHighlight") then return end
+
+	local h=Instance.new("Highlight")
+	h.Name="AuraHighlight"
+	h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	h.Adornee=char
+	h.Parent=char
+
+	startAuraPulse(h)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(c)
+	task.wait(0.2)
+	setupAura(c)
+end)
+
+if LocalPlayer.Character then
+	setupAura(LocalPlayer.Character)
+end
+
+-------------------------------------------------------
+-- ESP
+-------------------------------------------------------
+
+local function setupCharacter(player,char)
+	if player==LocalPlayer then return end
+
+	local hum=char:WaitForChild("Humanoid",5)
+	local root=char:WaitForChild("HumanoidRootPart",5)
+	if not hum or not root then return end
+
+	local h=Instance.new("Highlight")
+	h.FillTransparency=0.35
+	h.OutlineTransparency=0
+	h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	h.Adornee=char
+	h.Parent=char
+
+	startChamsPulse(h)
+
+	local gui=Instance.new("BillboardGui")
+	gui.Adornee=root
+	gui.Size=UDim2.fromOffset(220,70)
+	gui.StudsOffset=Vector3.new(0,3,0)
+	gui.AlwaysOnTop=true
+	gui.Parent=char
+
+	local label=Instance.new("TextLabel")
+	label.BackgroundTransparency=1
+	label.Size=UDim2.fromScale(1,1)
+	label.Font=Enum.Font.GothamBold
+	label.TextColor3=Color3.new(1,1,1)
+	label.TextStrokeTransparency=0
+	label.TextSize=11
+	label.Parent=gui
+
+	local cam=workspace.CurrentCamera
+
+	task.spawn(function()
+		while char.Parent and hum.Parent do
+			if not ESP_ENABLED or not INFO_ENABLED then
+				gui.Enabled=false
+			else
+				gui.Enabled=true
+
+				if cam then
+					local d = (cam.CFrame.Position - root.Position).Magnitude
+
+					if d < 250 then
+						label.TextSize = 11
+						gui.StudsOffset = Vector3.new(0,4.2,0)
+					elseif d < 650 then
+						label.TextSize = 10
+						gui.StudsOffset = Vector3.new(0,6.4,0)
+					else
+						label.TextSize = 9
+						gui.StudsOffset = Vector3.new(0,9.2,0)
+					end
+				end
+
+				local item=getHeldTool(char)
+				checkItem(player,item)
+
+				label.Text =
+					player.Name..
+					"\nHP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth)..
+					"\nItem: "..item
+			end
+
+			task.wait(0.2)
+		end
+	end)
+end
+
+local function setupPlayer(p)
+	p.CharacterAdded:Connect(function(c)
+		setupCharacter(p,c)
+	end)
+	if p.Character then
+		setupCharacter(p,p.Character)
+	end
+end
+
+for _,p in ipairs(Players:GetPlayers()) do
+	setupPlayer(p)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+-------------------------------------------------------
+-- BEHIND YOU INDICATOR
+-------------------------------------------------------
+
+local indicatorGui = Instance.new("ScreenGui")
+indicatorGui.Name = "BehindIndicatorGui"
+indicatorGui.ResetOnSpawn = false
+indicatorGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local arrows = {}
+
+local function getArrowForPlayer(plr)
+
+	if arrows[plr] then
+		return arrows[plr]
+	end
+
+	local container = Instance.new("Frame")
+	container.BackgroundTransparency = 1
+	container.Size = UDim2.fromOffset(60,40)
+	container.AnchorPoint = Vector2.new(0.5,0.5)
+	container.Visible = false
+	container.Parent = indicatorGui
+
+	local img = Instance.new("ImageLabel")
+	img.BackgroundTransparency = 1
+	img.Size = UDim2.fromOffset(20,20)
+	img.Position = UDim2.fromOffset(20,0)
+	img.Image = "rbxassetid://7072718362"
+	img.ImageColor3 = Color3.fromRGB(160,80,255)
+	img.Parent = container
+
+	local text = Instance.new("TextLabel")
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromOffset(60,16)
+	text.Position = UDim2.fromOffset(0,22)
+
+	text.Font = Enum.Font.GothamBold
+	text.TextSize = 14 -- SMALL TEXT
+	text.TextColor3 = Color3.new(1,1,1)
+	text.TextStrokeTransparency = 0.5
+	text.Text = ""
+	text.Parent = container
+
+	arrows[plr] = {
+		container = container,
+		image = img,
+		label = text
+	}
+
+	return arrows[plr]
+
+end
+
+RunService.RenderStepped:Connect(function()
+
+	if not BEHIND_INDICATOR then
+		for _,a in pairs(arrows) do
+			a.container.Visible = false
+		end
+		return
+	end
+
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+
+	for _,plr in ipairs(Players:GetPlayers()) do
+
+		if plr ~= LocalPlayer and plr.Character then
+
+			local root = plr.Character:FindFirstChild("HumanoidRootPart")
+			local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+			if root and myRoot then
+
+				local arrowData = getArrowForPlayer(plr)
+
+				local camCF = cam.CFrame
+				local dir = (root.Position - camCF.Position).Unit
+
+				local distance = (root.Position - myRoot.Position).Magnitude
+
+				-- ONLY SHOW WITHIN 200 STUDS (200m)
+				if distance > 200 then
+					arrowData.container.Visible = false
+					continue
+				end
+
+				local dot = camCF.LookVector:Dot(dir)
+
+				if dot < -0.15 then
+
+					local screenCenter = cam.ViewportSize / 2
+
+					local right = camCF.RightVector
+					local side = right:Dot(dir)
+
+					local xOffset = 160
+					local posX = screenCenter.X + (side > 0 and xOffset or -xOffset)
+
+					arrowData.container.Position =
+						UDim2.fromOffset(posX, screenCenter.Y)
+
+					arrowData.image.Rotation =
+						side > 0 and 90 or -90
+
+					-- SHOW NAME + DISTANCE IN METERS
+					arrowData.label.Text =
+						plr.Name .. "  " .. math.floor(distance) .. "m"
+
+					arrowData.container.Visible = true
+
+				else
+					arrowData.container.Visible = false
+				end
+
+			end
+		end
+	end
+
+end)
+
+RunService.RenderStepped:Connect(function()
+
+	if not BEHIND_INDICATOR then
+		for _,a in pairs(arrows) do
+			a.Visible = false
+		end
+		return
+	end
+
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+
+	for _,plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character then
+
+			local root = plr.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+
+				local arrow = getArrowForPlayer(plr)
+
+				local camCF = cam.CFrame
+				local dir = (root.Position - camCF.Position).Unit
+
+				local dot = camCF.LookVector:Dot(dir)
+
+				if dot < -0.15 then
+					local screenCenter = cam.ViewportSize / 2
+
+					local right = camCF.RightVector
+					local side = right:Dot(dir)
+
+					local xOffset = 160
+					local posX = screenCenter.X + (side > 0 and xOffset or -xOffset)
+
+					arrow.Position = UDim2.fromOffset(posX, screenCenter.Y)
+					arrow.Rotation = side > 0 and 90 or -90
+					arrow.Visible = true
+				else
+					arrow.Visible = false
+				end
+			end
+		end
+	end
+end)
