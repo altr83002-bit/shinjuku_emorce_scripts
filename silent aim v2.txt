@@ -1,0 +1,126 @@
+-- Silent Aim v2.5 - No Prediction + Tracer + FOV Adjuster
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+getgenv().SilentAim = {
+    Enabled = true,
+    TargetPart = "Head",
+    FOV = 140,
+    HitChance = 100,
+    TeamCheck = false,
+    ShowFOV = true,
+    TracerEnabled = true,
+}
+
+-- ==================== DRAWINGS ====================
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 80
+FOVCircle.Color = Color3.fromRGB(255, 50, 50)
+FOVCircle.Transparency = 0.75
+FOVCircle.Filled = false
+FOVCircle.Visible = true
+
+local Tracer = Drawing.new("Line")
+Tracer.Thickness = 2
+Tracer.Color = Color3.fromRGB(255, 0, 0)
+Tracer.Transparency = 0.8
+Tracer.Visible = false
+
+-- ==================== GET CLOSEST ====================
+local LockedTarget = nil
+
+local function GetClosestPlayer()
+    local closest = nil
+    local shortest = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            if getgenv().SilentAim.TeamCheck and player.Team == LocalPlayer.Team then continue end
+
+            local part = player.Character:FindFirstChild(getgenv().SilentAim.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
+            if not part then continue end
+
+            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if not onScreen then continue end
+
+            local mousePos = UserInputService:GetMouseLocation()
+            local dist = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+
+            if dist < shortest and dist <= getgenv().SilentAim.FOV then
+                shortest = dist
+                closest = part
+            end
+        end
+    end
+    return closest
+end
+
+-- ==================== RENDER LOOP ====================
+RunService.RenderStepped:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    -- Update FOV Circle
+    FOVCircle.Position = mousePos
+    FOVCircle.Radius = getgenv().SilentAim.FOV
+    FOVCircle.Visible = getgenv().SilentAim.ShowFOV and getgenv().SilentAim.Enabled
+
+    -- Get target and update Tracer
+    LockedTarget = GetClosestPlayer()
+    
+    if getgenv().SilentAim.TracerEnabled and LockedTarget and getgenv().SilentAim.Enabled then
+        local screenPos, onScreen = Camera:WorldToViewportPoint(LockedTarget.Position)
+        
+        if onScreen then
+            Tracer.From = mousePos
+            Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+            Tracer.Visible = true
+        else
+            Tracer.Visible = false
+        end
+    else
+        Tracer.Visible = false
+    end
+end)
+
+-- ==================== MOUSE HOOK ====================
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, key)
+    if getgenv().SilentAim.Enabled and self == Mouse and key == "Hit" then
+        if LockedTarget and math.random(1, 100) <= getgenv().SilentAim.HitChance then
+            return CFrame.new(LockedTarget.Position)  -- No Prediction
+        end
+    end
+    return oldIndex(self, key)
+end)
+
+setreadonly(mt, true)
+
+-- ==================== HOTKEYS ====================
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    
+    if input.KeyCode == Enum.KeyCode.Insert then
+        getgenv().SilentAim.Enabled = not getgenv().SilentAim.Enabled
+        print("Silent Aim:", getgenv().SilentAim.Enabled and "ON" or "OFF")
+        
+    elseif input.KeyCode == Enum.KeyCode.RightBracket then -- ] Increase FOV
+        getgenv().SilentAim.FOV = getgenv().SilentAim.FOV + 10
+        print("FOV Increased →", getgenv().SilentAim.FOV)
+        
+    elseif input.KeyCode == Enum.KeyCode.LeftBracket then -- [ Decrease FOV
+        getgenv().SilentAim.FOV = math.max(30, getgenv().SilentAim.FOV - 10)
+        print("FOV Decreased →", getgenv().SilentAim.FOV)
+    end
+end)
+
+print("✅ Silent Aim v2.5 (0 Prediction) Loaded")
+print("INSERT = Toggle | [ ] = Adjust FOV")
